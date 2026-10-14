@@ -1,0 +1,12 @@
+{
+  "tools": [
+    {
+      "id": "dice",
+      "enabled": true,
+      "allowedCapabilities": ["LOCAL_STATE"],
+      "limits": {
+        "maxStateBytes": 262144
+      }
+    }
+  ]
+}
