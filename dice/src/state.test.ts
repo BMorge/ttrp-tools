@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import manifest from '../tool.manifest.json';
+
 import {
   DICE_STATE_SCHEMA_VERSION,
   MAX_HISTORY,
@@ -19,6 +21,10 @@ const record = (index: number): RollRecord => ({
 });
 
 describe('dice state', () => {
+  it('uses the schema version declared in the manifest', () => {
+    expect(DICE_STATE_SCHEMA_VERSION).toBe(manifest.storageSchemaVersion);
+  });
+
   it('starts with one D20 when nothing is saved', () => {
     expect(restoreDiceState(null)).toEqual({ state: initialDiceState(), reset: false });
     expect(initialDiceState().selection.counts.d20).toBe(1);

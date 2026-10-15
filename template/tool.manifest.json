@@ -1,0 +1,18 @@
+{
+  "manifestVersion": 1,
+  "id": "template",
+  "version": "0.1.0",
+  "title": "Шаблон: заметка",
+  "description": "Минимальный инструмент: подключение к оболочке, сохранение состояния и события окна",
+  "bridgeVersion": 1,
+  "entrypoint": "./index.html",
+  "storageSchemaVersion": 1,
+  "requestedCapabilities": ["LOCAL_STATE"],
+  "window": {
+    "width": 480,
+    "height": 360,
+    "minWidth": 320,
+    "minHeight": 240,
+    "multipleInstances": true
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "name": "ttrp-tools",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SDK, песочница и примеры встраиваемых инструментов TtRP (Time to Roleplay)",
+  "homepage": "https://timetoroleplay.ru",
+  "license": "Apache-2.0",
+  "author": "ООО «ТАЙМ ТУ РОЛЕПЛЕЙ»",
+  "type": "module",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/build.mjs",
+    "serve": "node scripts/serve.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm run test && npm run build",
+    "create-tool": "node scripts/create-tool.mjs"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.21.0",
+    "three": "^0.186.1",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/three": "^0.186.0",
+    "typescript": "^5.7.2",
+    "vite": "^7.3.2",
+    "vitest": "^3.2.4"
+  }
+}

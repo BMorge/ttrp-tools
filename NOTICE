@@ -1,0 +1,15 @@
+TtRP Tools
+Copyright 2026 ООО «ТАЙМ ТУ РОЛЕПЛЕЙ» (ООО «ТТРП»)
+
+This product includes software developed by ООО «ТАЙМ ТУ РОЛЕПЛЕЙ»
+(https://timetoroleplay.ru) and contributors to TtRP Tools.
+
+The names "TtRP", "TTRP", "Time to Roleplay" and related logos identify
+the Time to Roleplay service of ООО «ТТРП». The Apache License 2.0 does not
+grant permission to use them (section 6 of the License).
+
+The tools in this repository bundle third-party software under its own licenses:
+
+- three.js — MIT License, Copyright © 2010-2026 three.js authors
+- Rapier (@dimforge/rapier3d-compat) — Apache License 2.0, Copyright 2020 Dimforge EURL
+- Zod — MIT License, Copyright (c) 2025 Colin McDonnell

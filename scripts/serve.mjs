@@ -4,22 +4,17 @@ import path from 'node:path';
 
 import { loadEnv } from 'vite';
 
-import {
-  DEV_TOOLS_PORT,
-  FRONT_DIR,
-  TOOLS_DIST_DIR,
-  resolveHostOrigins,
-  toolResponseHeaders,
-} from './tools-config.mjs';
+import { TOOLS_PORT, TOOLS_ROOT, parseArgs, resolveHostOrigins, toolResponseHeaders } from './lib.mjs';
 
 /**
- * Serves the built tools (front/tools-dist) the way production nginx does: release paths only,
- * the same security headers, HTML revalidated, hashed assets immutable. Lets you check the built
- * bundle locally; build it for the local shell first:
- *   TTRP_TOOLS_HOST_ORIGINS=http://localhost:3000 npm run build:tools
+ * Serves built tools the way a production tools host does: release paths only, the same security
+ * headers, HTML revalidated, hashed assets immutable. `npm run serve [-- --dir dist]`.
+ * Build for a local shell first, e.g. TTRP_TOOLS_HOST_ORIGINS=http://localhost:5180 npm run build.
  */
 
-const env = loadEnv('development', FRONT_DIR, ['NEXT_PUBLIC_', 'TTRP_']);
+const options = parseArgs();
+const root = path.resolve(process.cwd(), typeof options.dir === 'string' ? options.dir : path.join(TOOLS_ROOT, 'dist'));
+const env = loadEnv('development', TOOLS_ROOT, ['NEXT_PUBLIC_', 'TTRP_']);
 const hostOrigins = resolveHostOrigins('development', env);
 const securityHeaders = toolResponseHeaders({ hostOrigins });
 const RELEASE_PATH = /^\/[a-z0-9-]+\/\d+\.\d+\.\d+\//;
@@ -34,8 +29,8 @@ const CONTENT_TYPES = {
   '.webp': 'image/webp',
 };
 
-if (!fs.existsSync(TOOLS_DIST_DIR)) {
-  console.error('tools: front/tools-dist is missing — run `npm run build:tools` first');
+if (!fs.existsSync(root)) {
+  console.error(`tools: ${root} is missing — build the tools first`);
   process.exit(1);
 }
 
@@ -56,10 +51,10 @@ const server = http.createServer((request, response) => {
     reply(400, 'Bad request');
     return;
   }
-  const file = path.normalize(path.join(TOOLS_DIST_DIR, pathname));
+  const file = path.normalize(path.join(root, pathname));
   if (
     !RELEASE_PATH.test(pathname)
-    || !file.startsWith(TOOLS_DIST_DIR + path.sep)
+    || !file.startsWith(root + path.sep)
     || !fs.existsSync(file)
     || !fs.statSync(file).isFile()
   ) {
@@ -81,12 +76,16 @@ const server = http.createServer((request, response) => {
   fs.createReadStream(file).pipe(response);
 });
 
-server.listen(DEV_TOOLS_PORT, 'localhost', () => {
-  console.log(`tools: built tools on http://localhost:${DEV_TOOLS_PORT} (from front/tools-dist)`);
-  console.log(`tools: trusted shell origins — ${hostOrigins.join(', ')}`);
-  for (const id of fs.readdirSync(TOOLS_DIST_DIR)) {
-    for (const version of fs.readdirSync(path.join(TOOLS_DIST_DIR, id))) {
-      console.log(`tools: ${id} → http://localhost:${DEV_TOOLS_PORT}/${id}/${version}/index.html`);
+server.listen(TOOLS_PORT, 'localhost', () => {
+  console.log(`tools: built tools on http://localhost:${TOOLS_PORT} from ${path.relative(process.cwd(), root) || '.'}`);
+  console.log(`tools: frame-ancestors — ${hostOrigins.join(', ')}`);
+  for (const id of fs.readdirSync(root)) {
+    const toolDir = path.join(root, id);
+    if (!fs.statSync(toolDir).isDirectory()) {
+      continue;
+    }
+    for (const version of fs.readdirSync(toolDir)) {
+      console.log(`tools: ${id} → http://localhost:${TOOLS_PORT}/${id}/${version}/index.html`);
     }
   }
 });
