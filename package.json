@@ -4,6 +4,13 @@
   "private": true,
   "description": "SDK, песочница и примеры встраиваемых инструментов TtRP (Time to Roleplay)",
   "homepage": "https://timetoroleplay.ru",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BMorge/ttrp-tools.git"
+  },
+  "bugs": {
+    "url": "https://github.com/BMorge/ttrp-tools/issues"
+  },
   "license": "Apache-2.0",
   "author": "ООО «ТАЙМ ТУ РОЛЕПЛЕЙ»",
   "type": "module",
