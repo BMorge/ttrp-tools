@@ -7,6 +7,7 @@ import { RETHROW_LIFT, cryptoRandom, planThrow } from './throw';
 import { createDieVisual, disposeDieVisual, type DieVisual } from './visuals';
 
 import type { DieType } from './types';
+import type { SoundBatch } from '../sound/voices';
 
 /**
  * - OK: every die shows a clear top face (or D4 vertex), values are counted;
@@ -31,6 +32,8 @@ export interface RollOutcome {
 
 export interface DiceEngineCallbacks {
   onContextLost: () => void;
+  /** Knocks of every animation frame of a roll. */
+  onContacts?: (batch: SoundBatch) => void;
 }
 
 /** Up to 0.25 s of simulation per frame: low frame rates slow the picture, not the dice. */
@@ -67,7 +70,7 @@ export class DiceEngine {
     return new DiceEngine(container, callbacks);
   }
 
-  private constructor(container: HTMLElement, callbacks: DiceEngineCallbacks) {
+  private constructor(container: HTMLElement, private readonly callbacks: DiceEngineCallbacks) {
     this.scene = new DiceScene(container);
     this.scene.canvas.addEventListener('webglcontextlost', (event) => {
       event.preventDefault();
@@ -212,6 +215,7 @@ export class DiceEngine {
         this.advanceRoll();
       }
       this.scene.updatePoses(this.physics.poses());
+      this.reportContacts();
     }
     this.scene.render();
 
@@ -219,6 +223,25 @@ export class DiceEngine {
       this.frame = requestAnimationFrame(this.tick);
     }
   };
+
+  private reportContacts(): void {
+    const contacts = this.physics.takeContacts();
+    if (contacts.impacts.length === 0 || !this.callbacks.onContacts) {
+      return;
+    }
+    const types = this.tableTypes;
+    this.callbacks.onContacts({
+      impacts: contacts.impacts.map((impact) => ({
+        type: types[impact.die],
+        otherType: impact.otherDie === null ? null : types[impact.otherDie],
+        surface: impact.surface,
+        speed: impact.speed,
+        x: impact.position[0],
+        z: impact.position[2],
+        at: impact.at,
+      })),
+    });
+  }
 
   private advanceRoll(): void {
     const roll = this.roll;

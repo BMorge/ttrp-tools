@@ -14,7 +14,7 @@
 Каждое окно — `iframe` с отдельного origin инструментов: на проде `https://tools.timetoroleplay.ru`, локально `http://localhost:5173`. Сайт TtRP и инструменты — разные origin, поэтому код инструмента не видит DOM, токены, cookie и хранилища сайта.
 
 ```html
-<iframe sandbox="allow-scripts allow-same-origin" referrerpolicy="no-referrer" src="https://tools.timetoroleplay.ru/dice/0.1.0/index.html">
+<iframe sandbox="allow-scripts allow-same-origin" referrerpolicy="no-referrer" src="https://tools.timetoroleplay.ru/dice/0.2.0/index.html">
 ```
 
 Песочница iframe разрешает только скрипты и собственный origin инструмента. Нет `allow-forms`, `allow-popups`, `allow-modals`, `allow-downloads`, `allow-top-navigation`: формы не отправляются, `window.open`, `alert`/`confirm`/`prompt` и скачивание файлов не работают, уйти со страницы сайта инструмент не может.

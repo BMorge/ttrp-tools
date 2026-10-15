@@ -3,12 +3,14 @@ import { describe, expect, it } from 'vitest';
 import manifest from '../tool.manifest.json';
 
 import {
+  DEFAULT_SOUND,
   DICE_STATE_SCHEMA_VERSION,
   MAX_HISTORY,
   initialDiceState,
   restoreDiceState,
   toSnapshotState,
   withRoll,
+  withSound,
   type RollRecord,
 } from './state';
 
@@ -31,7 +33,7 @@ describe('dice state', () => {
   });
 
   it('round-trips through a snapshot', () => {
-    const state = withRoll(initialDiceState(), record(1));
+    const state = withSound(withRoll(initialDiceState(), record(1)), { enabled: false, volume: 0.35 });
     const snapshot = {
       state: toSnapshotState(state),
       schemaVersion: DICE_STATE_SCHEMA_VERSION,
@@ -43,10 +45,22 @@ describe('dice state', () => {
 
   it('resets a corrupted or unknown save instead of failing', () => {
     const corrupted = { state: { history: 'nope' }, schemaVersion: 1, updatedAt: '2026-10-14T12:00:00.000Z' };
-    const future = { state: toSnapshotState(initialDiceState()), schemaVersion: 2, updatedAt: '2026-10-14T12:00:00.000Z' };
+    const future = { state: toSnapshotState(initialDiceState()), schemaVersion: 3, updatedAt: '2026-10-14T12:00:00.000Z' };
 
     expect(restoreDiceState(corrupted)).toEqual({ state: initialDiceState(), reset: true });
     expect(restoreDiceState(future)).toEqual({ state: initialDiceState(), reset: true });
+  });
+
+  it('migrates a save from before the sound: dice and history stay, the sound gets the defaults', () => {
+    const { selection, history } = withRoll(initialDiceState(), record(1));
+    const saved = { state: toSnapshotState({ selection, history } as never), schemaVersion: 1, updatedAt: '2026-10-14T12:00:00.000Z' };
+
+    expect(restoreDiceState(saved)).toEqual({ state: { selection, history, sound: DEFAULT_SOUND }, reset: false });
+  });
+
+  it('keeps the volume within 0…1', () => {
+    expect(withSound(initialDiceState(), { enabled: true, volume: 3 }).sound.volume).toBe(1);
+    expect(withSound(initialDiceState(), { enabled: true, volume: -1 }).sound.volume).toBe(0);
   });
 
   it('keeps only the latest rolls', () => {

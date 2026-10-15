@@ -1,12 +1,12 @@
 {
   "manifestVersion": 1,
   "id": "dice",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "title": "Кубики",
-  "description": "Физические 3D-кубики: D4–D20, формулы вида 2d6+3 и история бросков",
+  "description": "Физические 3D-кубики со звуком: D4–D20, формулы вида 2d6+3 и история бросков",
   "bridgeVersion": 1,
   "entrypoint": "./index.html",
-  "storageSchemaVersion": 1,
+  "storageSchemaVersion": 2,
   "requestedCapabilities": ["LOCAL_STATE"],
   "window": {
     "width": 820,

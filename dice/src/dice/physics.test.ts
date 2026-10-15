@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { getDieModel } from './models';
-import { DicePhysics, PHYSICS_STEP, initPhysics } from './physics';
+import { DicePhysics, PHYSICS_STEP, initPhysics, type DieImpact } from './physics';
 import { isClearlyReadable, readDie } from './reading';
 import { RETHROW_LIFT, planThrow } from './throw';
 import { DIE_SIDES, DIE_TYPES, type DieType } from './types';
@@ -84,6 +84,60 @@ describe('dice physics', () => {
 
     expect(slowest).toBeLessThan(6);
     expect(readable / dice).toBeGreaterThan(0.97);
+  });
+
+  it('reports knocks while the dice move and falls silent when they rest', () => {
+    const types: DieType[] = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'];
+    const physics = new DicePhysics();
+    const launches = planThrow(types.length, seededRandom(77));
+    types.forEach((type, index) => {
+      physics.addDie(Float32Array.from(getDieModel(type).vertices.flat()), launches[index]);
+    });
+
+    const impacts: DieImpact[] = [];
+    for (let step = 1; step <= Math.round(1.5 / PHYSICS_STEP); step += 1) {
+      physics.step();
+      if (step % 2 === 0) {
+        const batch = physics.takeContacts();
+        impacts.push(...batch.impacts);
+        batch.impacts.forEach((impact) => expect(impact.at).toBeLessThan(2 * PHYSICS_STEP));
+      }
+    }
+
+    expect(impacts.length).toBeGreaterThan(10);
+    expect(impacts.some((impact) => impact.surface === 'floor')).toBe(true);
+    expect(Math.max(...impacts.map((impact) => impact.speed))).toBeGreaterThan(8);
+
+    expect(settle(physics).escaped).toBe(false);
+    physics.takeContacts();
+    for (let step = 0; step < 60; step += 1) {
+      physics.step();
+    }
+    const resting = physics.takeContacts();
+    physics.dispose();
+
+    expect(resting.impacts).toEqual([]);
+  });
+
+  it('hears dice knocking each other in a big throw', () => {
+    const types = Array.from({ length: 20 }, (_, index) => DIE_TYPES[index % DIE_TYPES.length]);
+    const physics = new DicePhysics();
+    const launches = planThrow(types.length, seededRandom(78));
+    types.forEach((type, index) => {
+      physics.addDie(Float32Array.from(getDieModel(type).vertices.flat()), launches[index]);
+    });
+    for (let step = 0; step < Math.round(1 / PHYSICS_STEP); step += 1) {
+      physics.step();
+    }
+    const { impacts } = physics.takeContacts();
+    physics.dispose();
+
+    const knocks = impacts.filter((impact) => impact.surface === 'die');
+    expect(knocks.length).toBeGreaterThan(3);
+    knocks.forEach((knock) => {
+      expect(knock.otherDie).not.toBeNull();
+      expect(knock.otherDie).not.toBe(knock.die);
+    });
   });
 
   it('re-throws only the unclear dice of a full 20-dice throw until all are readable', () => {

@@ -5,18 +5,30 @@ import { connectToHost, createAutosave, type Autosave, type ToolHostClient } fro
 import manifest from '../tool.manifest.json';
 
 import { selectionToTypes } from './notation';
+import { DiceAudio } from './sound/audio';
 import {
   DICE_STATE_SCHEMA_VERSION,
   restoreDiceState,
   toSnapshotState,
   withRoll,
   withSelection,
+  withSound,
   withoutHistory,
   type DiceState,
 } from './state';
 import { DiceUi } from './ui';
 
 import type { DiceEngine, RollOutcome } from './dice/engine';
+import type { DieType } from './dice/types';
+
+/** Work that can wait: after the page has settled, before the user needs it. */
+function whenIdle(task: () => void): void {
+  if (typeof window.requestIdleCallback === 'function') {
+    window.requestIdleCallback(() => task(), { timeout: 2000 });
+  } else {
+    setTimeout(task, 300);
+  }
+}
 
 function reportError(client: ToolHostClient, code: string, message: string, fatal: boolean): void {
   void client.request('lifecycle.reportError', { code, message: message.slice(0, 500), fatal }).catch(() => {});
@@ -28,16 +40,20 @@ async function start(root: HTMLElement): Promise<void> {
   let autosave: Autosave | null = null;
   /** The dice lying in the tray and the modifier of that throw, for a partial re-throw. */
   let lastThrow: { outcome: RollOutcome; modifier: number } | null = null;
+  const audio = new DiceAudio(state.sound);
 
+  // Browsers start audio only from a gesture in this frame: every roll button unlocks it first.
   const ui = new DiceUi(root, {
     onSelectionChange(selection) {
       state = withSelection(state, selection);
       autosave?.schedule();
     },
     onRoll() {
+      audio.unlock();
       void roll();
     },
     onRerollUnreadable() {
+      audio.unlock();
       void rerollUnreadable();
     },
     onClearHistory() {
@@ -45,9 +61,21 @@ async function start(root: HTMLElement): Promise<void> {
       ui.setHistory(state.history);
       autosave?.schedule();
     },
+    onSoundChange(sound, preview) {
+      state = withSound(state, sound);
+      audio.update(state.sound);
+      if (state.sound.enabled) {
+        audio.unlock();
+        if (preview) {
+          audio.preview();
+        }
+      }
+      autosave?.schedule();
+    },
   });
   ui.setSelection(state.selection);
   ui.setHistory(state.history);
+  ui.setSound(state.sound);
   ui.setStatus('Подключение к TtRP…');
 
   // Connect first: the shell is waiting for TOOL_READY while the heavy engine is not needed yet.
@@ -81,13 +109,17 @@ async function start(root: HTMLElement): Promise<void> {
   }
   ui.setSelection(state.selection);
   ui.setHistory(state.history);
+  ui.setSound(state.sound);
+  audio.update(state.sound);
 
   let visible = client.initiallyVisible;
+  audio.setPaused(!visible);
   client.subscribe((event) => {
     switch (event.type) {
       case 'VISIBILITY_CHANGED':
         visible = event.visible;
         engine?.setPaused(!visible);
+        audio.setPaused(!visible);
         break;
       case 'CLOSE_REQUESTED':
         void (async () => {
@@ -100,6 +132,7 @@ async function start(root: HTMLElement): Promise<void> {
         autosave = null;
         engine?.dispose();
         engine = null;
+        audio.dispose();
         ui.showFatal('Сессия завершена.');
         break;
     }
@@ -114,6 +147,7 @@ async function start(root: HTMLElement): Promise<void> {
         ui.showFatal('Графика остановилась. Перезапустите окно.');
         reportError(client, 'WEBGL_CONTEXT_LOST', 'WebGL context lost', true);
       },
+      onContacts: (batch) => audio.play(batch),
     });
   } catch (error) {
     ui.showFatal('Не удалось запустить 3D: браузер не поддерживает WebGL.');
@@ -128,13 +162,22 @@ async function start(root: HTMLElement): Promise<void> {
   engine.setPaused(!visible);
   ui.setStatus(null);
   ui.setReady(true);
+  // The sound's takes (≈ 70 ms of synthesis) are rendered now, not on the first click.
+  if (state.sound.enabled) {
+    whenIdle(() => audio.prepare());
+  }
 
-  async function play(start: (dice: DiceEngine) => Promise<RollOutcome>, modifier: number): Promise<void> {
+  async function play(
+    start: (dice: DiceEngine) => Promise<RollOutcome>,
+    modifier: number,
+    thrown: readonly DieType[],
+  ): Promise<void> {
     if (!engine || engine.rolling) {
       return;
     }
     ui.setRolling(true);
     ui.showOutcome(null, modifier);
+    audio.throwStarted(thrown);
     try {
       const outcome = await start(engine);
       lastThrow = { outcome, modifier };
@@ -160,14 +203,19 @@ async function start(root: HTMLElement): Promise<void> {
   async function roll(): Promise<void> {
     const types = selectionToTypes(state.selection);
     if (types.length > 0) {
-      await play((dice) => dice.throwDice(types), state.selection.modifier);
+      await play((dice) => dice.throwDice(types), state.selection.modifier, types);
     }
   }
 
   async function rerollUnreadable(): Promise<void> {
     const previous = lastThrow;
     if (previous && previous.outcome.unreadable.length > 0) {
-      await play((dice) => dice.rethrowDice(previous.outcome.unreadable), previous.modifier);
+      const { dice, unreadable } = previous.outcome;
+      await play(
+        (engineDice) => engineDice.rethrowDice(unreadable),
+        previous.modifier,
+        unreadable.map((index) => dice[index].type),
+      );
     }
   }
 }

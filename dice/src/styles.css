@@ -326,6 +326,50 @@ button:focus-visible {
   cursor: pointer;
 }
 
+.sound {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.sound__toggle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.sound__toggle:hover {
+  border-color: var(--color-primary);
+}
+
+.sound__toggle[aria-pressed='false'] {
+  color: var(--color-muted);
+}
+
+.sound__icon {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sound__volume {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--color-primary);
+}
+
 .history__header {
   display: flex;
   align-items: baseline;

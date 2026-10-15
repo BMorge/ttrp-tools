@@ -6,7 +6,7 @@ import { MAX_DICE_PER_ROLL, MAX_MODIFIER, emptyCounts, type DiceSelection } from
 import type { JsonValue, StateSnapshot } from '@tools-sdk/protocol';
 
 /** Saved state of one dice window. Bump the version together with a migration in restoreDiceState. */
-export const DICE_STATE_SCHEMA_VERSION = 1;
+export const DICE_STATE_SCHEMA_VERSION = 2;
 export const MAX_HISTORY = 50;
 
 const countSchema = z.number().int().min(0).max(MAX_DICE_PER_ROLL);
@@ -35,18 +35,32 @@ const rollRecordSchema = z.object({
   total: z.number().int(),
 }).strict();
 
-const diceStateSchema = z.object({
+const soundSchema = z.object({
+  enabled: z.boolean(),
+  volume: z.number().min(0).max(1),
+}).strict();
+
+/** Schema 1: before the sound. */
+const diceStateV1Schema = z.object({
   selection: selectionSchema,
   history: z.array(rollRecordSchema).max(MAX_HISTORY),
 }).strict();
 
+const diceStateSchema = diceStateV1Schema.extend({
+  sound: soundSchema,
+}).strict();
+
 export type RollRecord = z.infer<typeof rollRecordSchema>;
+export type SoundSettings = z.infer<typeof soundSchema>;
 export type DiceState = z.infer<typeof diceStateSchema>;
+
+export const DEFAULT_SOUND: SoundSettings = { enabled: true, volume: 0.7 };
 
 export function initialDiceState(): DiceState {
   return {
     selection: { counts: { ...emptyCounts(), d20: 1 }, modifier: 0 },
     history: [],
+    sound: { ...DEFAULT_SOUND },
   };
 }
 
@@ -54,6 +68,13 @@ export function initialDiceState(): DiceState {
 export function restoreDiceState(snapshot: StateSnapshot | null): { state: DiceState; reset: boolean } {
   if (!snapshot) {
     return { state: initialDiceState(), reset: false };
+  }
+  if (snapshot.schemaVersion === 1) {
+    // Saved before the sound appeared: keep the dice and the history, the sound starts with the defaults.
+    const parsed = diceStateV1Schema.safeParse(snapshot.state);
+    return parsed.success
+      ? { state: { ...parsed.data, sound: { ...DEFAULT_SOUND } }, reset: false }
+      : { state: initialDiceState(), reset: true };
   }
   if (snapshot.schemaVersion !== DICE_STATE_SCHEMA_VERSION) {
     return { state: initialDiceState(), reset: true };
@@ -76,4 +97,8 @@ export function withRoll(state: DiceState, record: RollRecord): DiceState {
 
 export function withoutHistory(state: DiceState): DiceState {
   return { ...state, history: [] };
+}
+
+export function withSound(state: DiceState, sound: SoundSettings): DiceState {
+  return { ...state, sound: { enabled: sound.enabled, volume: Math.min(1, Math.max(0, sound.volume)) } };
 }

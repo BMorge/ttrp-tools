@@ -10,7 +10,7 @@ import {
 } from './notation';
 
 import type { RollOutcome } from './dice/engine';
-import type { RollRecord } from './state';
+import type { RollRecord, SoundSettings } from './state';
 
 export interface DiceUiHandlers {
   onSelectionChange: (selection: DiceSelection) => void;
@@ -18,6 +18,8 @@ export interface DiceUiHandlers {
   /** Re-throws only the dice without a clear top face; the rest stay in the tray. */
   onRerollUnreadable: () => void;
   onClearHistory: () => void;
+  /** `preview`: the user finished a change and wants to hear the result. */
+  onSoundChange: (sound: SoundSettings, preview: boolean) => void;
 }
 
 interface ElementOptions {
@@ -43,6 +45,22 @@ function element<K extends keyof HTMLElementTagNameMap>(
   }
   node.append(...children);
   return node;
+}
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function speakerIcon(muted: boolean): SVGSVGElement {
+  const icon = document.createElementNS(SVG_NS, 'svg');
+  icon.setAttribute('viewBox', '0 0 24 24');
+  icon.setAttribute('aria-hidden', 'true');
+  icon.classList.add('sound__icon');
+  const strokes = muted ? ['M16 9.5l5 5', 'M21 9.5l-5 5'] : ['M15.5 9a4.5 4.5 0 0 1 0 6', 'M18 6.5a8 8 0 0 1 0 11'];
+  for (const shape of ['M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z', ...strokes]) {
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', shape);
+    icon.append(path);
+  }
+  return icon;
 }
 
 function button(text: string, className: string, label?: string): HTMLButtonElement {
@@ -92,6 +110,9 @@ export class DiceUi {
   private readonly rollButton: HTMLButtonElement;
   private readonly historyList: HTMLOListElement;
   private readonly historyEmpty: HTMLElement;
+  private readonly soundToggle: HTMLButtonElement;
+  private readonly volumeInput: HTMLInputElement;
+  private sound: SoundSettings = { enabled: true, volume: 0.7 };
   private readonly controls: Array<HTMLButtonElement | HTMLInputElement> = [];
   /** Buttons inside the current result banner; replaced with every outcome. */
   private resultButtons: HTMLButtonElement[] = [];
@@ -181,6 +202,24 @@ export class DiceUi {
     this.notice = element('p', { className: 'notice', attributes: { role: 'status' } });
     this.notice.hidden = true;
 
+    // Sound stays available while the dice roll: muting must never wait.
+    this.soundToggle = element('button', { className: 'sound__toggle', attributes: { type: 'button' } });
+    this.soundToggle.addEventListener('click', () => {
+      this.commitSound({ ...this.sound, enabled: !this.sound.enabled }, true);
+    });
+    this.volumeInput = element('input', {
+      className: 'sound__volume',
+      attributes: { type: 'range', min: '0', max: '100', step: '5', 'aria-label': 'Громкость' },
+    });
+    // Moving the volume turns the sound on: that is what the user is reaching for.
+    this.volumeInput.addEventListener('input', () => {
+      this.commitSound({ enabled: true, volume: Number(this.volumeInput.value) / 100 }, false);
+    });
+    this.volumeInput.addEventListener('change', () => {
+      this.commitSound({ enabled: true, volume: Number(this.volumeInput.value) / 100 }, true);
+    });
+    const sound = element('div', { className: 'sound' }, [this.soundToggle, this.volumeInput]);
+
     const panel = element('aside', { className: 'panel' }, [
       element('section', { className: 'panel__section' }, [
         element('h2', { className: 'panel__title', text: 'Набор' }),
@@ -189,6 +228,7 @@ export class DiceUi {
         this.formulaError,
         this.summary,
         this.rollButton,
+        sound,
         this.notice,
       ]),
       element('section', { className: 'panel__section panel__section--history' }, [
@@ -202,7 +242,16 @@ export class DiceUi {
     ]);
 
     root.replaceChildren(stage, panel);
+    this.setSound(this.sound);
     this.refreshControls();
+  }
+
+  setSound(sound: SoundSettings): void {
+    this.sound = sound;
+    this.soundToggle.setAttribute('aria-pressed', String(sound.enabled));
+    this.soundToggle.title = sound.enabled ? 'Выключить звук' : 'Включить звук';
+    this.soundToggle.replaceChildren(speakerIcon(!sound.enabled), document.createTextNode('Звук'));
+    this.volumeInput.value = String(Math.round(sound.volume * 100));
   }
 
   setStatus(text: string | null): void {
@@ -340,6 +389,11 @@ export class DiceUi {
   private commitSelection(selection: DiceSelection): void {
     this.setSelection(selection);
     this.handlers.onSelectionChange(selection);
+  }
+
+  private commitSound(sound: SoundSettings, preview: boolean): void {
+    this.setSound(sound);
+    this.handlers.onSoundChange(sound, preview);
   }
 
   private refreshControls(): void {
